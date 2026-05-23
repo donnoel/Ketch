@@ -283,14 +283,66 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func handleMiss(_ contact: SKPhysicsContact) {
-        let object = fallingObject(from: contact)
-        object?.removeFromParent()
+        guard let object = fallingObject(from: contact) else { return }
+        let missPosition = object.position
+        object.removeFromParent()
 
         lives -= 1
+        showMissFeedback(at: missPosition)
+        shakeScene()
+        pulseLostHeart()
 
         if lives <= 0 {
             endGame()
         }
+    }
+
+    private func showMissFeedback(at position: CGPoint) {
+        let missLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        missLabel.text = "Miss"
+        missLabel.fontSize = 22
+        missLabel.fontColor = .white
+        missLabel.position = CGPoint(x: position.x, y: max(position.y + 28, 54))
+        missLabel.zPosition = 12
+        missLabel.alpha = 0
+
+        addChild(missLabel)
+
+        let appear = SKAction.fadeIn(withDuration: 0.06)
+        let lift = SKAction.moveBy(x: 0, y: 24, duration: 0.28)
+        lift.timingMode = .easeOut
+        let fade = SKAction.fadeOut(withDuration: 0.22)
+        let finish = SKAction.removeFromParent()
+
+        missLabel.run(SKAction.sequence([
+            appear,
+            SKAction.group([lift, fade]),
+            finish
+        ]))
+    }
+
+    private func shakeScene() {
+        removeAction(forKey: "missShake")
+
+        let moveLeft = SKAction.moveBy(x: -8, y: 0, duration: 0.035)
+        let moveRight = SKAction.moveBy(x: 16, y: 0, duration: 0.07)
+        let settle = SKAction.moveBy(x: -8, y: 0, duration: 0.035)
+        let shake = SKAction.sequence([moveLeft, moveRight, settle])
+
+        run(shake, withKey: "missShake")
+    }
+
+    private func pulseLostHeart() {
+        guard lives >= 0, lives < heartNodes.count else { return }
+
+        let heart = heartNodes[lives]
+        heart.removeAction(forKey: "lostHeartPulse")
+
+        let grow = SKAction.scale(to: 1.22, duration: 0.08)
+        let shrink = SKAction.scale(to: 0.86, duration: 0.12)
+        let pulse = SKAction.sequence([grow, shrink])
+
+        heart.run(pulse, withKey: "lostHeartPulse")
     }
 
     private func fallingObject(from contact: SKPhysicsContact) -> SKNode? {
