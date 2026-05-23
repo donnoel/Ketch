@@ -16,8 +16,13 @@ final class GameViewController: UIViewController {
         skView.presentScene(scene)
 
         skView.ignoresSiblingOrder = true
-        skView.showsFPS = true
-        skView.showsNodeCount = true
+
+        // Keep SpriteKit debug overlays off for normal gameplay.
+        skView.showsFPS = false
+        skView.showsNodeCount = false
+        skView.showsPhysics = false
+        skView.showsDrawCount = false
+        skView.showsQuadCount = false
     }
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
