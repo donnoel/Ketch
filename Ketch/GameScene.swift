@@ -11,6 +11,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private let player = SKSpriteNode(imageNamed: "player-basket")
     private let scoreLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let livesLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let levelLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let gameOverLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
     private var score = 0 {
@@ -22,6 +23,12 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private var lives = 3 {
         didSet {
             livesLabel.text = "Lives: \(lives)"
+        }
+    }
+
+    private var level = 1 {
+        didSet {
+            levelLabel.text = "Level: \(level)"
         }
     }
 
@@ -49,7 +56,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func setupPhysics() {
-        physicsWorld.gravity = CGVector(dx: 0, dy: -2.5)
+        physicsWorld.gravity = CGVector(dx: 0, dy: gravityForCurrentLevel)
         physicsWorld.contactDelegate = self
 
         let ground = SKNode()
@@ -95,6 +102,15 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
         addChild(livesLabel)
 
+        levelLabel.text = "Level: \(level)"
+        levelLabel.fontSize = 24
+        levelLabel.fontColor = .white
+        levelLabel.horizontalAlignmentMode = .center
+        levelLabel.position = CGPoint(x: size.width / 2, y: size.height - 108)
+        levelLabel.zPosition = 10
+
+        addChild(levelLabel)
+
         gameOverLabel.text = "Game Over\nTap to Restart"
         gameOverLabel.fontSize = 36
         gameOverLabel.fontColor = .white
@@ -113,7 +129,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
             self?.spawnFallingObject()
         }
 
-        let wait = SKAction.wait(forDuration: 1.0)
+        let wait = SKAction.wait(forDuration: spawnDelayForCurrentLevel)
         let sequence = SKAction.sequence([spawn, wait])
         let repeatForever = SKAction.repeatForever(sequence)
 
@@ -172,10 +188,70 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func handleCatch(_ contact: SKPhysicsContact) {
-        let object = fallingObject(from: contact)
-        object?.removeFromParent()
+        guard let object = fallingObject(from: contact) else { return }
+        let catchPosition = object.position
+        object.removeFromParent()
 
         score += 1
+        updateLevelIfNeeded()
+        showCatchFeedback(at: catchPosition)
+        bouncePlayer()
+    }
+
+    private func showCatchFeedback(at position: CGPoint) {
+        let sparkle = SKSpriteNode(imageNamed: "sparkle")
+        sparkle.position = position
+        sparkle.size = CGSize(width: 36, height: 36)
+        sparkle.zPosition = 8
+        sparkle.alpha = 0
+        sparkle.setScale(0.4)
+
+        addChild(sparkle)
+
+        let appear = SKAction.group([
+            SKAction.fadeIn(withDuration: 0.06),
+            SKAction.scale(to: 1.15, duration: 0.10)
+        ])
+        let drift = SKAction.moveBy(x: 0, y: 18, duration: 0.18)
+        drift.timingMode = .easeOut
+        let fade = SKAction.fadeOut(withDuration: 0.18)
+        let finish = SKAction.removeFromParent()
+
+        sparkle.run(SKAction.sequence([
+            appear,
+            SKAction.group([drift, fade]),
+            finish
+        ]))
+    }
+
+    private func bouncePlayer() {
+        player.removeAction(forKey: "catchBounce")
+        player.setScale(1.0)
+
+        let squash = SKAction.scaleX(to: 1.08, y: 0.92, duration: 0.06)
+        let stretch = SKAction.scaleX(to: 0.96, y: 1.06, duration: 0.07)
+        let settle = SKAction.scale(to: 1.0, duration: 0.08)
+        let bounce = SKAction.sequence([squash, stretch, settle])
+
+        player.run(bounce, withKey: "catchBounce")
+    }
+
+    private var spawnDelayForCurrentLevel: TimeInterval {
+        max(0.35, 1.0 - (Double(level - 1) * 0.08))
+    }
+
+    private var gravityForCurrentLevel: CGFloat {
+        -2.5 - (CGFloat(level - 1) * 0.35)
+    }
+
+    private func updateLevelIfNeeded() {
+        let newLevel = (score / 5) + 1
+        guard newLevel != level else { return }
+
+        level = newLevel
+        physicsWorld.gravity = CGVector(dx: 0, dy: gravityForCurrentLevel)
+        removeAction(forKey: "spawningObjects")
+        startSpawningObjects()
     }
 
     private func handleMiss(_ contact: SKPhysicsContact) {
@@ -213,6 +289,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
         score = 0
         lives = 3
+        level = 1
         isGameOver = false
 
         setupScene()
