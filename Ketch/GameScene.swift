@@ -10,9 +10,9 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
     private let player = SKSpriteNode(imageNamed: "player-basket")
     private let scoreLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
-    private let livesLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let levelLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let gameOverLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private var heartNodes: [SKSpriteNode] = []
 
     private var score = 0 {
         didSet {
@@ -22,7 +22,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
     private var lives = 3 {
         didSet {
-            livesLabel.text = "Lives: \(lives)"
+            updateHearts()
         }
     }
 
@@ -93,14 +93,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
         addChild(scoreLabel)
 
-        livesLabel.text = "Lives: \(lives)"
-        livesLabel.fontSize = 28
-        livesLabel.fontColor = .white
-        livesLabel.horizontalAlignmentMode = .right
-        livesLabel.position = CGPoint(x: size.width - 24, y: size.height - 70)
-        livesLabel.zPosition = 10
-
-        addChild(livesLabel)
+        setupHearts()
 
         levelLabel.text = "Level: \(level)"
         levelLabel.fontSize = 24
@@ -122,6 +115,41 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         gameOverLabel.isHidden = true
 
         addChild(gameOverLabel)
+    }
+
+    private func setupHearts() {
+        heartNodes.forEach { $0.removeFromParent() }
+        heartNodes.removeAll()
+
+        let heartSize = CGSize(width: 28, height: 28)
+        let spacing: CGFloat = 8
+        let rightPadding: CGFloat = 24
+        let yPosition = size.height - 62
+
+        for index in 0..<3 {
+            let heart = SKSpriteNode(imageNamed: "life-heart")
+            heart.size = heartSize
+            heart.zPosition = 10
+
+            let xOffset = CGFloat(2 - index) * (heartSize.width + spacing)
+            heart.position = CGPoint(
+                x: size.width - rightPadding - (heartSize.width / 2) - xOffset,
+                y: yPosition
+            )
+
+            addChild(heart)
+            heartNodes.append(heart)
+        }
+
+        updateHearts()
+    }
+
+    private func updateHearts() {
+        for (index, heart) in heartNodes.enumerated() {
+            let isFilled = index < lives
+            heart.alpha = isFilled ? 1.0 : 0.25
+            heart.setScale(isFilled ? 1.0 : 0.86)
+        }
     }
 
     private func startSpawningObjects() {
