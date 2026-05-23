@@ -10,11 +10,18 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
     private let player = SKSpriteNode(color: .systemBlue, size: CGSize(width: 72, height: 32))
     private let scoreLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let livesLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let gameOverLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
 
     private var score = 0 {
         didSet {
             scoreLabel.text = "Score: \(score)"
+        }
+    }
+
+    private var lives = 3 {
+        didSet {
+            livesLabel.text = "Lives: \(lives)"
         }
     }
 
@@ -60,13 +67,21 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func setupLabels() {
-        scoreLabel.text = "Score: 0"
+        scoreLabel.text = "Score: \(score)"
         scoreLabel.fontSize = 28
         scoreLabel.fontColor = .white
         scoreLabel.horizontalAlignmentMode = .left
         scoreLabel.position = CGPoint(x: 24, y: size.height - 70)
 
         addChild(scoreLabel)
+
+        livesLabel.text = "Lives: \(lives)"
+        livesLabel.fontSize = 28
+        livesLabel.fontColor = .white
+        livesLabel.horizontalAlignmentMode = .right
+        livesLabel.position = CGPoint(x: size.width - 24, y: size.height - 70)
+
+        addChild(livesLabel)
 
         gameOverLabel.text = "Game Over\nTap to Restart"
         gameOverLabel.fontSize = 36
@@ -153,7 +168,11 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         let object = fallingObject(from: contact)
         object?.removeFromParent()
 
-        endGame()
+        lives -= 1
+
+        if lives <= 0 {
+            endGame()
+        }
     }
 
     private func fallingObject(from contact: SKPhysicsContact) -> SKNode? {
@@ -179,6 +198,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         removeAllActions()
 
         score = 0
+        lives = 3
         isGameOver = false
 
         setupPhysics()

@@ -292,6 +292,7 @@
 				DEVELOPMENT_TEAM = H7LG8SK72M;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ketch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ketch;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
@@ -324,6 +325,7 @@
 				DEVELOPMENT_TEAM = H7LG8SK72M;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ketch/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ketch;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
