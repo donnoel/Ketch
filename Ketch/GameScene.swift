@@ -8,7 +8,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         static let ground: UInt32 = 1 << 2
     }
 
-    private let player = SKSpriteNode(color: .systemBlue, size: CGSize(width: 72, height: 32))
+    private let player = SKSpriteNode(imageNamed: "player-basket")
     private let scoreLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let livesLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let gameOverLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
@@ -38,6 +38,14 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private func setupScene() {
         backgroundColor = .black
         scaleMode = .resizeFill
+
+        let background = SKSpriteNode(imageNamed: "game-background")
+        background.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        background.size = size
+        background.zPosition = -10
+        background.alpha = 0.95
+
+        addChild(background)
     }
 
     private func setupPhysics() {
@@ -56,8 +64,10 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func setupPlayer() {
+        player.size = CGSize(width: 92, height: 52)
         player.position = CGPoint(x: size.width / 2, y: 90)
-        player.physicsBody = SKPhysicsBody(rectangleOf: player.size)
+        player.zPosition = 5
+        player.physicsBody = SKPhysicsBody(rectangleOf: CGSize(width: 78, height: 34))
         player.physicsBody?.isDynamic = false
         player.physicsBody?.categoryBitMask = PhysicsCategory.player
         player.physicsBody?.contactTestBitMask = PhysicsCategory.fallingObject
@@ -72,6 +82,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         scoreLabel.fontColor = .white
         scoreLabel.horizontalAlignmentMode = .left
         scoreLabel.position = CGPoint(x: 24, y: size.height - 70)
+        scoreLabel.zPosition = 10
 
         addChild(scoreLabel)
 
@@ -80,6 +91,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         livesLabel.fontColor = .white
         livesLabel.horizontalAlignmentMode = .right
         livesLabel.position = CGPoint(x: size.width - 24, y: size.height - 70)
+        livesLabel.zPosition = 10
 
         addChild(livesLabel)
 
@@ -90,6 +102,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         gameOverLabel.horizontalAlignmentMode = .center
         gameOverLabel.verticalAlignmentMode = .center
         gameOverLabel.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        gameOverLabel.zPosition = 20
         gameOverLabel.isHidden = true
 
         addChild(gameOverLabel)
@@ -110,14 +123,15 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private func spawnFallingObject() {
         guard !isGameOver else { return }
 
-        let object = SKShapeNode(circleOfRadius: 18)
-        object.fillColor = .systemYellow
-        object.strokeColor = .clear
+        let imageName = Bool.random() ? "falling-star" : "falling-apple"
+        let object = SKSpriteNode(imageNamed: imageName)
+        object.size = CGSize(width: 44, height: 44)
+        object.zPosition = 4
 
         let randomX = CGFloat.random(in: 40...(size.width - 40))
         object.position = CGPoint(x: randomX, y: size.height + 40)
 
-        object.physicsBody = SKPhysicsBody(circleOfRadius: 18)
+        object.physicsBody = SKPhysicsBody(circleOfRadius: 20)
         object.physicsBody?.categoryBitMask = PhysicsCategory.fallingObject
         object.physicsBody?.contactTestBitMask = PhysicsCategory.player | PhysicsCategory.ground
         object.physicsBody?.collisionBitMask = 0
@@ -201,6 +215,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         lives = 3
         isGameOver = false
 
+        setupScene()
         setupPhysics()
         setupPlayer()
         setupLabels()
