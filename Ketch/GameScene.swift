@@ -1,4 +1,5 @@
 import SpriteKit
+import UIKit
 
 final class GameScene: SKScene, SKPhysicsContactDelegate {
 
@@ -104,15 +105,16 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
         addChild(levelLabel)
 
-        gameOverLabel.text = "Game Over\nTap to Restart"
         gameOverLabel.fontSize = 36
         gameOverLabel.fontColor = .white
-        gameOverLabel.numberOfLines = 2
+        gameOverLabel.numberOfLines = 4
+        gameOverLabel.preferredMaxLayoutWidth = size.width - 48
         gameOverLabel.horizontalAlignmentMode = .center
         gameOverLabel.verticalAlignmentMode = .center
         gameOverLabel.position = CGPoint(x: size.width / 2, y: size.height / 2)
         gameOverLabel.zPosition = 20
         gameOverLabel.isHidden = true
+        updateGameOverLabel()
 
         addChild(gameOverLabel)
     }
@@ -357,15 +359,47 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         return nil
     }
 
+    private func updateGameOverLabel() {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+
+        let font = UIFont(name: "AvenirNext-Bold", size: gameOverLabel.fontSize)
+            ?? UIFont.boldSystemFont(ofSize: gameOverLabel.fontSize)
+
+        gameOverLabel.attributedText = NSAttributedString(
+            string: gameOverResultText,
+            attributes: [
+                .font: font,
+                .foregroundColor: SKColor.white,
+                .paragraphStyle: paragraphStyle
+            ]
+        )
+    }
+
+    private var gameOverResultText: String {
+        """
+        Game Over
+        Score: \(score)
+        Level Reached: \(level)
+        Tap to Restart
+        """
+    }
+
     private func endGame() {
         isGameOver = true
         removeAction(forKey: "spawningObjects")
+        updateGameOverLabel()
         gameOverLabel.isHidden = false
+
+        let accessibilityResult = gameOverResultText.replacingOccurrences(of: "\n", with: ". ")
+        view?.accessibilityLabel = accessibilityResult
+        UIAccessibility.post(notification: .announcement, argument: accessibilityResult)
     }
 
     private func restartGame() {
         removeAllChildren()
         removeAllActions()
+        view?.accessibilityLabel = nil
 
         score = 0
         lives = 3
