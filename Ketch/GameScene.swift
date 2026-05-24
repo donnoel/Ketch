@@ -4,6 +4,7 @@ import UIKit
 final class GameScene: SKScene, SKPhysicsContactDelegate {
 
     private static let highScoreKey = "Ketch.highScore"
+    private static let pointValueKey = "pointValue"
 
     private enum PhysicsCategory {
         static let player: UInt32 = 1 << 0
@@ -204,10 +205,13 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private func spawnFallingObject() {
         guard !isGameOver, !isReadyToStart else { return }
 
-        let imageName = Bool.random() ? "falling-star" : "falling-apple"
+        let isStar = Bool.random()
+        let imageName = isStar ? "falling-star" : "falling-apple"
+        let pointValue = isStar ? 2 : 1
         let object = SKSpriteNode(imageNamed: imageName)
         object.size = CGSize(width: 44, height: 44)
         object.zPosition = 4
+        object.userData = [GameScene.pointValueKey: pointValue]
 
         let randomX = CGFloat.random(in: 40...(size.width - 40))
         object.position = CGPoint(x: randomX, y: size.height + 40)
@@ -269,7 +273,8 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         let catchPosition = object.position
         object.removeFromParent()
 
-        score += 1
+        let pointValue = object.userData?[GameScene.pointValueKey] as? Int ?? 1
+        score += pointValue
         updateLevelIfNeeded()
         showCatchFeedback(at: catchPosition)
         bouncePlayer()
