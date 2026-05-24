@@ -3,6 +3,8 @@ import UIKit
 
 final class GameScene: SKScene, SKPhysicsContactDelegate {
 
+    private static let highScoreKey = "Ketch.highScore"
+
     private enum PhysicsCategory {
         static let player: UInt32 = 1 << 0
         static let fallingObject: UInt32 = 1 << 1
@@ -13,6 +15,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private let scoreLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let levelLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let gameOverLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let startLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private var heartNodes: [SKSpriteNode] = []
 
     private var score = 0 {
@@ -34,13 +37,16 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private var isGameOver = false
+    private var isReadyToStart = true
+    private var highScore = UserDefaults.standard.integer(forKey: GameScene.highScoreKey)
+    private var isNewHighScore = false
 
     override func didMove(to view: SKView) {
         setupScene()
         setupPhysics()
         setupPlayer()
         setupLabels()
-        startSpawningObjects()
+        setupStartLabel()
     }
 
     private func setupScene() {
@@ -107,7 +113,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
         gameOverLabel.fontSize = 36
         gameOverLabel.fontColor = .white
-        gameOverLabel.numberOfLines = 4
+        gameOverLabel.numberOfLines = 5
         gameOverLabel.preferredMaxLayoutWidth = size.width - 48
         gameOverLabel.horizontalAlignmentMode = .center
         gameOverLabel.verticalAlignmentMode = .center
@@ -117,6 +123,35 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         updateGameOverLabel()
 
         addChild(gameOverLabel)
+    }
+
+    private func setupStartLabel() {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+
+        let fontSize: CGFloat = 42
+        let font = UIFont(name: "AvenirNext-Bold", size: fontSize)
+            ?? UIFont.boldSystemFont(ofSize: fontSize)
+
+        startLabel.attributedText = NSAttributedString(
+            string: "Ketch\nHigh Score: \(highScore)\nTap to Start",
+            attributes: [
+                .font: font,
+                .foregroundColor: SKColor.white,
+                .paragraphStyle: paragraphStyle
+            ]
+        )
+        startLabel.numberOfLines = 3
+        startLabel.preferredMaxLayoutWidth = size.width - 48
+        startLabel.horizontalAlignmentMode = .center
+        startLabel.verticalAlignmentMode = .center
+        startLabel.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        startLabel.zPosition = 20
+        startLabel.isHidden = false
+
+        addChild(startLabel)
+
+        view?.accessibilityLabel = "Ketch. High Score: \(highScore). Tap to Start"
     }
 
     private func setupHearts() {
@@ -167,7 +202,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func spawnFallingObject() {
-        guard !isGameOver else { return }
+        guard !isGameOver, !isReadyToStart else { return }
 
         let imageName = Bool.random() ? "falling-star" : "falling-apple"
         let object = SKSpriteNode(imageNamed: imageName)
@@ -193,8 +228,20 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
             return
         }
 
+        if isReadyToStart {
+            startGame()
+            return
+        }
+
         let location = touch.location(in: self)
         movePlayer(toX: location.x)
+    }
+
+    private func startGame() {
+        isReadyToStart = false
+        startLabel.isHidden = true
+        view?.accessibilityLabel = nil
+        startSpawningObjects()
     }
 
     private func movePlayer(toX xPosition: CGFloat) {
@@ -378,8 +425,9 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
     private var gameOverResultText: String {
         """
-        Game Over
+        \(isNewHighScore ? "New Best!" : "Game Over")
         Score: \(score)
+        Best: \(highScore)
         Level Reached: \(level)
         Tap to Restart
         """
@@ -388,6 +436,13 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private func endGame() {
         isGameOver = true
         removeAction(forKey: "spawningObjects")
+
+        if score > highScore {
+            highScore = score
+            isNewHighScore = true
+            UserDefaults.standard.set(highScore, forKey: GameScene.highScoreKey)
+        }
+
         updateGameOverLabel()
         gameOverLabel.isHidden = false
 
@@ -405,11 +460,13 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         lives = 3
         level = 1
         isGameOver = false
+        isReadyToStart = true
+        isNewHighScore = false
 
         setupScene()
         setupPhysics()
         setupPlayer()
         setupLabels()
-        startSpawningObjects()
+        setupStartLabel()
     }
 }
