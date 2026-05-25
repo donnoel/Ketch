@@ -263,6 +263,8 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     func didBegin(_ contact: SKPhysicsContact) {
+        guard !isGameOver else { return }
+
         let categories = contact.bodyA.categoryBitMask | contact.bodyB.categoryBitMask
 
         if categories == PhysicsCategory.player | PhysicsCategory.fallingObject {
@@ -279,10 +281,19 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
         let pointValue = object.userData?[GameScene.pointValueKey] as? Int ?? 1
         score += pointValue
+        updateHighScoreIfNeeded()
         updateLevelIfNeeded()
         showCatchFeedback(at: catchPosition)
         showPointFeedback(points: pointValue, at: catchPosition)
         bouncePlayer()
+    }
+
+    private func updateHighScoreIfNeeded() {
+        guard score > highScore else { return }
+
+        highScore = score
+        isNewHighScore = true
+        UserDefaults.standard.set(highScore, forKey: GameScene.highScoreKey)
     }
 
     private func showCatchFeedback(at position: CGPoint) {
@@ -474,12 +485,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         isGameOver = true
         canRestartAfterGameOver = false
         removeAction(forKey: "spawningObjects")
-
-        if score > highScore {
-            highScore = score
-            isNewHighScore = true
-            UserDefaults.standard.set(highScore, forKey: GameScene.highScoreKey)
-        }
+        updateHighScoreIfNeeded()
 
         updateGameOverLabel()
         gameOverLabel.isHidden = false
