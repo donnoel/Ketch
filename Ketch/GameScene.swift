@@ -277,6 +277,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         score += pointValue
         updateLevelIfNeeded()
         showCatchFeedback(at: catchPosition)
+        showPointFeedback(points: pointValue, at: catchPosition)
         bouncePlayer()
     }
 
@@ -302,6 +303,31 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         sparkle.run(SKAction.sequence([
             appear,
             SKAction.group([drift, fade]),
+            finish
+        ]))
+    }
+
+    private func showPointFeedback(points: Int, at position: CGPoint) {
+        let pointLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        pointLabel.text = "+\(points)"
+        pointLabel.fontSize = points > 1 ? 26 : 22
+        pointLabel.fontColor = .white
+        pointLabel.horizontalAlignmentMode = .center
+        pointLabel.position = CGPoint(x: position.x, y: position.y + 28)
+        pointLabel.zPosition = 12
+        pointLabel.alpha = 0
+
+        addChild(pointLabel)
+
+        let appear = SKAction.fadeIn(withDuration: 0.06)
+        let lift = SKAction.moveBy(x: 0, y: 22, duration: 0.24)
+        lift.timingMode = .easeOut
+        let fade = SKAction.fadeOut(withDuration: 0.18)
+        let finish = SKAction.removeFromParent()
+
+        pointLabel.run(SKAction.sequence([
+            appear,
+            SKAction.group([lift, fade]),
             finish
         ]))
     }
