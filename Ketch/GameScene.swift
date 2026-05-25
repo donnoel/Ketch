@@ -5,6 +5,8 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
     private static let highScoreKey = "Ketch.highScore"
     private static let pointValueKey = "pointValue"
+    private static let enableGameOverRestartActionKey = "enableGameOverRestart"
+    private static let gameOverRestartLockoutDuration: TimeInterval = 1.25
 
     private enum PhysicsCategory {
         static let player: UInt32 = 1 << 0
@@ -38,6 +40,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private var isGameOver = false
+    private var canRestartAfterGameOver = false
     private var isReadyToStart = true
     private var highScore = UserDefaults.standard.integer(forKey: GameScene.highScoreKey)
     private var isNewHighScore = false
@@ -228,6 +231,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         guard let touch = touches.first else { return }
 
         if isGameOver {
+            guard canRestartAfterGameOver else { return }
             restartGame()
             return
         }
@@ -460,12 +464,15 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         Score: \(score)
         Best: \(highScore)
         Level Reached: \(level)
-        Tap to Restart
+        \(canRestartAfterGameOver ? "Tap to Restart" : "Restart available shortly")
         """
     }
 
     private func endGame() {
+        guard !isGameOver else { return }
+
         isGameOver = true
+        canRestartAfterGameOver = false
         removeAction(forKey: "spawningObjects")
 
         if score > highScore {
@@ -480,6 +487,20 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         let accessibilityResult = gameOverResultText.replacingOccurrences(of: "\n", with: ". ")
         view?.accessibilityLabel = accessibilityResult
         UIAccessibility.post(notification: .announcement, argument: accessibilityResult)
+
+        let enableRestart = SKAction.run { [weak self] in
+            guard let self else { return }
+
+            self.canRestartAfterGameOver = true
+            self.updateGameOverLabel()
+            self.view?.accessibilityLabel = self.gameOverResultText
+                .replacingOccurrences(of: "\n", with: ". ")
+        }
+        let lockout = SKAction.wait(forDuration: GameScene.gameOverRestartLockoutDuration)
+        run(
+            SKAction.sequence([lockout, enableRestart]),
+            withKey: GameScene.enableGameOverRestartActionKey
+        )
     }
 
     private func restartGame() {
@@ -491,6 +512,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         lives = 3
         level = 1
         isGameOver = false
+        canRestartAfterGameOver = false
         isReadyToStart = true
         isNewHighScore = false
 
