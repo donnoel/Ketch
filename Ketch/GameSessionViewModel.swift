@@ -51,7 +51,10 @@ final class GameSessionViewModel {
             return .shielded
         }
 
+        guard lives > 0 else { return .gameOver }
+
         lives -= 1
+        if lives < 0 { lives = 0 }
         return lives <= 0 ? .gameOver : .lifeLost
     }
 

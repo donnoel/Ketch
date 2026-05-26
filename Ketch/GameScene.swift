@@ -698,6 +698,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         isGameOver = true
         canRestartAfterGameOver = false
         removeAction(forKey: "spawningObjects")
+        removeAction(forKey: GameScene.enableGameOverRestartActionKey)
         gameSession.updateHighScoreIfNeeded()
         removeAction(forKey: GameScene.slowMotionPowerUpActionKey)
         removeAction(forKey: GameScene.scoreMultiplierPowerUpActionKey)
