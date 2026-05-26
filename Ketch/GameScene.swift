@@ -3,7 +3,6 @@ import UIKit
 
 final class GameScene: SKScene, SKPhysicsContactDelegate {
 
-    private static let highScoreKey = "Ketch.highScore"
     private static let pointValueKey = "pointValue"
     private static let itemTypeKey = "itemType"
     private static let enableGameOverRestartActionKey = "enableGameOverRestart"
@@ -12,7 +11,6 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private static let gameOverRestartLockoutDuration: TimeInterval = 1.25
     private static let slowMotionDuration: TimeInterval = 6.0
     private static let scoreMultiplierDuration: TimeInterval = 6.0
-    private static let scoreMultiplierValue = 2
     private static let slowedWorldSpeed: CGFloat = 0.55
 
     private enum PhysicsCategory {
@@ -50,7 +48,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
             case .slowMotion:
                 return "Slow"
             case .scoreBoost:
-                return "x\(GameScene.scoreMultiplierValue)"
+                return "x\(GameSessionViewModel.scoreMultiplierValue)"
             }
         }
 
@@ -92,33 +90,17 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private let gameOverLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let startLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private var heartNodes: [SKSpriteNode] = []
-
-    private var score = 0 {
-        didSet {
-            scoreLabel.text = "Score: \(score)"
-        }
-    }
-
-    private var lives = 3 {
-        didSet {
-            updateHearts()
-        }
-    }
-
-    private var level = 1 {
-        didSet {
-            levelLabel.text = "Level: \(level)"
-        }
-    }
+    private let gameSession = GameSessionViewModel()
 
     private var isGameOver = false
     private var canRestartAfterGameOver = false
     private var isReadyToStart = true
-    private var highScore = UserDefaults.standard.integer(forKey: GameScene.highScoreKey)
-    private var isNewHighScore = false
-    private var scoreMultiplier = 1
-    private var isSlowMotionPowerUpActive = false
-    private var isScoreMultiplierActive = false
+
+    private var score: Int { gameSession.score }
+    private var level: Int { gameSession.level }
+    private var lives: Int { gameSession.lives }
+    private var highScore: Int { gameSession.highScore }
+    private var isNewHighScore: Bool { gameSession.isNewHighScore }
 
     override func didMove(to view: SKView) {
         setupScene()
@@ -170,7 +152,6 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func setupLabels() {
-        scoreLabel.text = "Score: \(score)"
         scoreLabel.fontSize = 28
         scoreLabel.fontColor = .white
         scoreLabel.horizontalAlignmentMode = .left
@@ -178,10 +159,9 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         scoreLabel.zPosition = 10
 
         addChild(scoreLabel)
+        refreshScoreAndLevel()
 
         setupHearts()
-
-        levelLabel.text = "Level: \(level)"
         levelLabel.fontSize = 24
         levelLabel.fontColor = .white
         levelLabel.horizontalAlignmentMode = .center
@@ -231,6 +211,11 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         addChild(startLabel)
 
         view?.accessibilityLabel = "Ketch. High Score: \(highScore). Tap to Start"
+    }
+
+    private func refreshScoreAndLevel() {
+        scoreLabel.text = "Score: \(gameSession.score)"
+        levelLabel.text = "Level: \(gameSession.level)"
     }
 
     private func setupHearts() {
@@ -393,17 +378,19 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
         let type = FallingItemType(rawValue: object.userData?[GameScene.itemTypeKey] as? Int ?? 0) ?? .apple
         let basePointValue = object.userData?[GameScene.pointValueKey] as? Int ?? 0
-        let pointValue = basePointValue * scoreMultiplier
+        let catchResult = gameSession.addPoints(for: basePointValue)
 
-        if pointValue > 0 {
-            score += pointValue
-            showPointFeedback(points: pointValue, at: catchPosition)
+        if catchResult.awardedPoints > 0 {
+            showPointFeedback(points: catchResult.awardedPoints, at: catchPosition)
         } else {
             applyPowerup(itemType: type, at: catchPosition)
         }
 
-        updateHighScoreIfNeeded()
-        updateLevelIfNeeded()
+        if catchResult.didLevelUp {
+            onLevelUpdated()
+        }
+        gameSession.updateHighScoreIfNeeded()
+        refreshScoreAndLevel()
         showCatchFeedback(at: catchPosition)
         bouncePlayer()
     }
@@ -422,21 +409,21 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func applyExtraLifePowerUp(at position: CGPoint) {
-        let hadFullLives = lives >= heartNodes.count
-        lives = min(heartNodes.count, lives + 1)
+        let hadFullLives = gameSession.gainLife()
         let text = hadFullLives ? "Life Full" : "+1 Life"
+        updateHearts()
         showPowerUpFeedback(text: text, at: position, color: .systemGreen)
     }
 
     private func applySlowMotionPowerUp(at position: CGPoint) {
         removeAction(forKey: GameScene.slowMotionPowerUpActionKey)
 
-        isSlowMotionPowerUpActive = true
+        gameSession.activateSlowMotionPowerUp()
         physicsWorld.speed = GameScene.slowedWorldSpeed
 
         let endSlowMotion = SKAction.run { [weak self] in
             self?.physicsWorld.speed = 1.0
-            self?.isSlowMotionPowerUpActive = false
+            self?.gameSession.deactivateSlowMotionPowerUp()
         }
         run(SKAction.sequence([SKAction.wait(forDuration: GameScene.slowMotionDuration), endSlowMotion]), withKey: GameScene.slowMotionPowerUpActionKey)
         showPowerUpFeedback(text: "Slow Time", at: position, color: .systemBlue)
@@ -445,15 +432,13 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private func applyScoreMultiplierPowerUp(at position: CGPoint) {
         removeAction(forKey: GameScene.scoreMultiplierPowerUpActionKey)
 
-        isScoreMultiplierActive = true
-        scoreMultiplier = GameScene.scoreMultiplierValue
+        gameSession.activateScoreMultiplierPowerUp()
 
         let endMultiplier = SKAction.run { [weak self] in
-            self?.scoreMultiplier = 1
-            self?.isScoreMultiplierActive = false
+            self?.gameSession.deactivateScoreMultiplierPowerUp()
         }
         run(SKAction.sequence([SKAction.wait(forDuration: GameScene.scoreMultiplierDuration), endMultiplier]), withKey: GameScene.scoreMultiplierPowerUpActionKey)
-        showPowerUpFeedback(text: "x\(GameScene.scoreMultiplierValue) Score", at: position, color: .systemOrange)
+        showPowerUpFeedback(text: "x\(GameSessionViewModel.scoreMultiplierValue) Score", at: position, color: .systemOrange)
     }
 
     private func showPowerUpFeedback(text: String, at position: CGPoint, color: UIColor) {
@@ -475,14 +460,6 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         let finish = SKAction.removeFromParent()
 
         feedback.run(SKAction.sequence([appear, SKAction.group([lift, fade]), finish]))
-    }
-
-    private func updateHighScoreIfNeeded() {
-        guard score > highScore else { return }
-
-        highScore = score
-        isNewHighScore = true
-        UserDefaults.standard.set(highScore, forKey: GameScene.highScoreKey)
     }
 
     private func showCatchFeedback(at position: CGPoint) {
@@ -549,18 +526,15 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private var spawnDelayForCurrentLevel: TimeInterval {
-        max(0.35, 1.0 - (Double(level - 1) * 0.08))
+        gameSession.spawnDelay(forCurrentLevel: level)
     }
 
     private var gravityForCurrentLevel: CGFloat {
-        -2.5 - (CGFloat(level - 1) * 0.35)
+        gameSession.gravity(forCurrentLevel: level)
     }
 
-    private func updateLevelIfNeeded() {
-        let newLevel = (score / 5) + 1
-        guard newLevel != level else { return }
-
-        level = newLevel
+    private func onLevelUpdated() {
+        refreshScoreAndLevel()
         physicsWorld.gravity = CGVector(dx: 0, dy: gravityForCurrentLevel)
         removeAction(forKey: "spawningObjects")
         startSpawningObjects()
@@ -571,12 +545,13 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         let missPosition = object.position
         object.removeFromParent()
 
-        lives -= 1
+        let isGameOverAfterMiss = gameSession.loseLife()
+        updateHearts()
         showMissFeedback(at: missPosition)
         shakeScene()
         pulseLostHeart()
 
-        if lives <= 0 {
+        if isGameOverAfterMiss {
             endGame()
         }
     }
@@ -674,13 +649,11 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         isGameOver = true
         canRestartAfterGameOver = false
         removeAction(forKey: "spawningObjects")
-        updateHighScoreIfNeeded()
+        gameSession.updateHighScoreIfNeeded()
         removeAction(forKey: GameScene.slowMotionPowerUpActionKey)
         removeAction(forKey: GameScene.scoreMultiplierPowerUpActionKey)
         physicsWorld.speed = 1.0
-        scoreMultiplier = 1
-        isSlowMotionPowerUpActive = false
-        isScoreMultiplierActive = false
+        gameSession.resetPowerUps()
 
         updateGameOverLabel()
         gameOverLabel.isHidden = false
@@ -709,16 +682,10 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         removeAllActions()
         view?.accessibilityLabel = nil
 
-        score = 0
-        lives = 3
-        level = 1
-        scoreMultiplier = 1
-        isSlowMotionPowerUpActive = false
-        isScoreMultiplierActive = false
+        gameSession.resetGameState()
         isGameOver = false
         canRestartAfterGameOver = false
         isReadyToStart = true
-        isNewHighScore = false
 
         setupScene()
         setupPhysics()
