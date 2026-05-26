@@ -450,9 +450,17 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func applyExtraLifePowerUp(at position: CGPoint) {
+        let previousLives = lives
         let hadFullLives = gameSession.gainLife()
+        let currentLives = lives
+
         let text = hadFullLives ? "Life Full" : "+1 Life"
         updateHearts()
+        if hadFullLives {
+            pulseAllHearts()
+        } else {
+            animateLifeGain(from: previousLives, to: currentLives)
+        }
         showPowerUpFeedback(text: text, at: position, color: .systemGreen)
     }
 
@@ -652,6 +660,36 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         let pulse = SKAction.sequence([grow, shrink])
 
         heart.run(pulse, withKey: "lostHeartPulse")
+    }
+
+    private func animateLifeGain(from previousLives: Int, to currentLives: Int) {
+        guard currentLives > previousLives else { return }
+        guard currentLives <= heartNodes.count else { return }
+
+        let gainedHeartIndex = max(0, currentLives - 1)
+        let gainedHeart = heartNodes[gainedHeartIndex]
+        gainedHeart.removeAction(forKey: "lifeGainPulse")
+
+        let pop = SKAction.sequence([
+            SKAction.scale(to: 1.22, duration: 0.09),
+            SKAction.scale(to: 0.96, duration: 0.09),
+            SKAction.scale(to: 1.0, duration: 0.08)
+        ])
+        gainedHeart.run(pop, withKey: "lifeGainPulse")
+    }
+
+    private func pulseAllHearts() {
+        for (index, heart) in heartNodes.enumerated() {
+            heart.removeAction(forKey: "lifeGainPulse")
+            heart.removeAction(forKey: "fullLifePulse-\(index)")
+
+            let pop = SKAction.sequence([
+                SKAction.scale(to: 1.18, duration: 0.08),
+                SKAction.scale(to: 0.9, duration: 0.12),
+                SKAction.scale(to: 1.0, duration: 0.1)
+            ])
+            heart.run(pop, withKey: "fullLifePulse-\(index)")
+        }
     }
 
     private func fallingObject(from contact: SKPhysicsContact) -> SKNode? {
