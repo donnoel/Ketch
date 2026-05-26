@@ -103,6 +103,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private var isGameOver = false
     private var canRestartAfterGameOver = false
     private var isReadyToStart = true
+    private var isRestartingAfterGameOver = false
 
     private var score: Int { gameSession.score }
     private var level: Int { gameSession.level }
@@ -360,7 +361,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         guard let touch = touches.first else { return }
 
         if isGameOver {
-            guard canRestartAfterGameOver else { return }
+            guard canRestartAfterGameOver, !isRestartingAfterGameOver else { return }
             restartGame()
             return
         }
@@ -729,6 +730,10 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func restartGame() {
+        guard !isRestartingAfterGameOver else { return }
+        isRestartingAfterGameOver = true
+        isGameOver = true
+        removeAction(forKey: GameScene.enableGameOverRestartActionKey)
         removeAllChildren()
         removeAllActions()
         view?.accessibilityLabel = nil
@@ -744,5 +749,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         refreshShieldIndicator()
         setupLabels()
         setupStartLabel()
+        isGameOver = false
+        isRestartingAfterGameOver = false
     }
 }
