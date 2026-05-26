@@ -731,25 +731,15 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
     private func restartGame() {
         guard !isRestartingAfterGameOver else { return }
+        guard let skView = view else { return }
+
         isRestartingAfterGameOver = true
-        isGameOver = true
         removeAction(forKey: GameScene.enableGameOverRestartActionKey)
-        removeAllChildren()
-        removeAllActions()
-        view?.accessibilityLabel = nil
 
-        gameSession.resetGameState()
-        isGameOver = false
-        canRestartAfterGameOver = false
-        isReadyToStart = true
-
-        setupScene()
-        setupPhysics()
-        setupPlayer()
-        refreshShieldIndicator()
-        setupLabels()
-        setupStartLabel()
-        isGameOver = false
-        isRestartingAfterGameOver = false
+        let nextScene = GameScene(size: size)
+        nextScene.scaleMode = scaleMode
+        DispatchQueue.main.async { [weak skView] in
+            skView?.presentScene(nextScene)
+        }
     }
 }
