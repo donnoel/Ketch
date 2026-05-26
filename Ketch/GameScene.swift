@@ -95,6 +95,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private let scoreLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let levelLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let gameOverLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let levelUpLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let startLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let shieldIndicator = SKShapeNode(circleOfRadius: 52)
     private var heartNodes: [SKSpriteNode] = []
@@ -215,6 +216,16 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         updateGameOverLabel()
 
         addChild(gameOverLabel)
+
+        levelUpLabel.fontSize = 34
+        levelUpLabel.fontColor = .systemYellow
+        levelUpLabel.horizontalAlignmentMode = .center
+        levelUpLabel.verticalAlignmentMode = .center
+        levelUpLabel.position = CGPoint(x: size.width / 2, y: size.height - 170)
+        levelUpLabel.zPosition = 12
+        levelUpLabel.isHidden = true
+
+        addChild(levelUpLabel)
     }
 
     private func setupStartLabel() {
@@ -421,6 +432,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
         if catchResult.didLevelUp {
             onLevelUpdated()
+            showLevelUpFeedback()
         }
         gameSession.updateHighScoreIfNeeded()
         refreshScoreAndLevel()
@@ -560,6 +572,34 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
             SKAction.group([lift, fade]),
             finish
         ]))
+    }
+
+    private func showLevelUpFeedback() {
+        levelUpLabel.removeAction(forKey: "levelUpFeedback")
+        levelUpLabel.position = CGPoint(x: size.width / 2, y: size.height - 170)
+        levelUpLabel.text = "Level Up!"
+        levelUpLabel.alpha = 0
+        levelUpLabel.setScale(0.78)
+        levelUpLabel.isHidden = false
+
+        let appear = SKAction.fadeIn(withDuration: 0.08)
+        let rise = SKAction.moveBy(x: 0, y: 22, duration: 0.32)
+        rise.timingMode = .easeOut
+        let fade = SKAction.fadeOut(withDuration: 0.22)
+        let pop = SKAction.scale(to: 1.0, duration: 0.09)
+        pop.timingMode = .easeOut
+        let reset = SKAction.run { [weak self] in
+            self?.levelUpLabel.isHidden = true
+        }
+
+        levelUpLabel.run(
+            SKAction.sequence([
+                SKAction.group([appear, pop]),
+                SKAction.group([rise, fade]),
+                reset
+            ]),
+            withKey: "levelUpFeedback"
+        )
     }
 
     private func bouncePlayer() {
