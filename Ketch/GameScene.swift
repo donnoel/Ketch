@@ -5,13 +5,85 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
 
     private static let highScoreKey = "Ketch.highScore"
     private static let pointValueKey = "pointValue"
+    private static let itemTypeKey = "itemType"
     private static let enableGameOverRestartActionKey = "enableGameOverRestart"
+    private static let slowMotionPowerUpActionKey = "activeSlowMotionPowerUp"
+    private static let scoreMultiplierPowerUpActionKey = "activeScoreMultiplierPowerUp"
     private static let gameOverRestartLockoutDuration: TimeInterval = 1.25
+    private static let slowMotionDuration: TimeInterval = 6.0
+    private static let scoreMultiplierDuration: TimeInterval = 6.0
+    private static let scoreMultiplierValue = 2
+    private static let slowedWorldSpeed: CGFloat = 0.55
 
     private enum PhysicsCategory {
         static let player: UInt32 = 1 << 0
         static let fallingObject: UInt32 = 1 << 1
         static let ground: UInt32 = 1 << 2
+    }
+
+    private enum FallingItemType: Int {
+        case apple
+        case star
+        case extraLife
+        case slowMotion
+        case scoreBoost
+
+        var pointValue: Int {
+            switch self {
+            case .apple:
+                return 1
+            case .star:
+                return 2
+            case .extraLife, .slowMotion, .scoreBoost:
+                return 0
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .apple:
+                return ""
+            case .star:
+                return ""
+            case .extraLife:
+                return "Life"
+            case .slowMotion:
+                return "Slow"
+            case .scoreBoost:
+                return "x\(GameScene.scoreMultiplierValue)"
+            }
+        }
+
+        var color: UIColor {
+            switch self {
+            case .apple:
+                return .clear
+            case .star:
+                return .clear
+            case .extraLife:
+                return .systemGreen
+            case .slowMotion:
+                return .systemBlue
+            case .scoreBoost:
+                return .systemOrange
+            }
+        }
+
+        static func random() -> FallingItemType {
+            let roll = Int.random(in: 0..<100)
+            switch roll {
+            case 0..<50:
+                return .apple
+            case 50..<80:
+                return .star
+            case 80..<90:
+                return .extraLife
+            case 90..<96:
+                return .slowMotion
+            default:
+                return .scoreBoost
+            }
+        }
     }
 
     private let player = SKSpriteNode(imageNamed: "player-basket")
@@ -44,6 +116,9 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private var isReadyToStart = true
     private var highScore = UserDefaults.standard.integer(forKey: GameScene.highScoreKey)
     private var isNewHighScore = false
+    private var scoreMultiplier = 1
+    private var isSlowMotionPowerUpActive = false
+    private var isScoreMultiplierActive = false
 
     override func didMove(to view: SKView) {
         setupScene()
@@ -208,13 +283,9 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private func spawnFallingObject() {
         guard !isGameOver, !isReadyToStart else { return }
 
-        let isStar = Bool.random()
-        let imageName = isStar ? "falling-star" : "falling-apple"
-        let pointValue = isStar ? 2 : 1
-        let object = SKSpriteNode(imageNamed: imageName)
-        object.size = CGSize(width: 44, height: 44)
-        object.zPosition = 4
-        object.userData = [GameScene.pointValueKey: pointValue]
+        let itemType = FallingItemType.random()
+        let object = makeFallingObject(for: itemType)
+        object.userData = [GameScene.pointValueKey: itemType.pointValue, GameScene.itemTypeKey: itemType.rawValue]
 
         let randomX = CGFloat.random(in: 40...(size.width - 40))
         object.position = CGPoint(x: randomX, y: size.height + 40)
@@ -225,6 +296,47 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         object.physicsBody?.collisionBitMask = 0
 
         addChild(object)
+    }
+
+    private func makeFallingObject(for itemType: FallingItemType) -> SKNode {
+        switch itemType {
+        case .apple:
+            let node = SKSpriteNode(imageNamed: "falling-apple")
+            node.size = CGSize(width: 44, height: 44)
+            node.zPosition = 4
+            return node
+        case .star:
+            let node = SKSpriteNode(imageNamed: "falling-star")
+            node.size = CGSize(width: 44, height: 44)
+            node.zPosition = 4
+            return node
+        case .extraLife, .slowMotion, .scoreBoost:
+            let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            label.fontSize = 14
+            label.text = itemType.label
+            label.fontColor = .white
+            label.verticalAlignmentMode = .center
+            label.horizontalAlignmentMode = .center
+
+            let node = SKShapeNode(circleOfRadius: 22)
+            node.fillColor = itemType.color
+            node.strokeColor = .white
+            node.lineWidth = 2
+            node.zPosition = 4
+            node.addChild(label)
+            node.name = itemType.label
+
+            let badge = SKSpriteNode(imageNamed: "life-heart")
+            badge.size = CGSize(width: 12, height: 12)
+            badge.position = CGPoint(x: -12, y: 8)
+            badge.color = itemType == .extraLife ? .systemGreen : .clear
+            badge.colorBlendFactor = itemType == .extraLife ? 1.0 : 0.0
+            if itemType == .extraLife {
+                node.addChild(badge)
+            }
+
+            return node
+        }
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -279,13 +391,90 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         let catchPosition = object.position
         object.removeFromParent()
 
-        let pointValue = object.userData?[GameScene.pointValueKey] as? Int ?? 1
-        score += pointValue
+        let type = FallingItemType(rawValue: object.userData?[GameScene.itemTypeKey] as? Int ?? 0) ?? .apple
+        let basePointValue = object.userData?[GameScene.pointValueKey] as? Int ?? 0
+        let pointValue = basePointValue * scoreMultiplier
+
+        if pointValue > 0 {
+            score += pointValue
+            showPointFeedback(points: pointValue, at: catchPosition)
+        } else {
+            applyPowerup(itemType: type, at: catchPosition)
+        }
+
         updateHighScoreIfNeeded()
         updateLevelIfNeeded()
         showCatchFeedback(at: catchPosition)
-        showPointFeedback(points: pointValue, at: catchPosition)
         bouncePlayer()
+    }
+
+    private func applyPowerup(itemType: FallingItemType, at position: CGPoint) {
+        switch itemType {
+        case .apple, .star:
+            return
+        case .extraLife:
+            applyExtraLifePowerUp(at: position)
+        case .slowMotion:
+            applySlowMotionPowerUp(at: position)
+        case .scoreBoost:
+            applyScoreMultiplierPowerUp(at: position)
+        }
+    }
+
+    private func applyExtraLifePowerUp(at position: CGPoint) {
+        let hadFullLives = lives >= heartNodes.count
+        lives = min(heartNodes.count, lives + 1)
+        let text = hadFullLives ? "Life Full" : "+1 Life"
+        showPowerUpFeedback(text: text, at: position, color: .systemGreen)
+    }
+
+    private func applySlowMotionPowerUp(at position: CGPoint) {
+        removeAction(forKey: GameScene.slowMotionPowerUpActionKey)
+
+        isSlowMotionPowerUpActive = true
+        physicsWorld.speed = GameScene.slowedWorldSpeed
+
+        let endSlowMotion = SKAction.run { [weak self] in
+            self?.physicsWorld.speed = 1.0
+            self?.isSlowMotionPowerUpActive = false
+        }
+        run(SKAction.sequence([SKAction.wait(forDuration: GameScene.slowMotionDuration), endSlowMotion]), withKey: GameScene.slowMotionPowerUpActionKey)
+        showPowerUpFeedback(text: "Slow Time", at: position, color: .systemBlue)
+    }
+
+    private func applyScoreMultiplierPowerUp(at position: CGPoint) {
+        removeAction(forKey: GameScene.scoreMultiplierPowerUpActionKey)
+
+        isScoreMultiplierActive = true
+        scoreMultiplier = GameScene.scoreMultiplierValue
+
+        let endMultiplier = SKAction.run { [weak self] in
+            self?.scoreMultiplier = 1
+            self?.isScoreMultiplierActive = false
+        }
+        run(SKAction.sequence([SKAction.wait(forDuration: GameScene.scoreMultiplierDuration), endMultiplier]), withKey: GameScene.scoreMultiplierPowerUpActionKey)
+        showPowerUpFeedback(text: "x\(GameScene.scoreMultiplierValue) Score", at: position, color: .systemOrange)
+    }
+
+    private func showPowerUpFeedback(text: String, at position: CGPoint, color: UIColor) {
+        let feedback = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        feedback.text = text
+        feedback.fontSize = 20
+        feedback.fontColor = color
+        feedback.horizontalAlignmentMode = .center
+        feedback.position = CGPoint(x: position.x, y: position.y + 28)
+        feedback.zPosition = 12
+        feedback.alpha = 0
+
+        addChild(feedback)
+
+        let appear = SKAction.fadeIn(withDuration: 0.06)
+        let lift = SKAction.moveBy(x: 0, y: 22, duration: 0.24)
+        lift.timingMode = .easeOut
+        let fade = SKAction.fadeOut(withDuration: 0.2)
+        let finish = SKAction.removeFromParent()
+
+        feedback.run(SKAction.sequence([appear, SKAction.group([lift, fade]), finish]))
     }
 
     private func updateHighScoreIfNeeded() {
@@ -486,6 +675,12 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         canRestartAfterGameOver = false
         removeAction(forKey: "spawningObjects")
         updateHighScoreIfNeeded()
+        removeAction(forKey: GameScene.slowMotionPowerUpActionKey)
+        removeAction(forKey: GameScene.scoreMultiplierPowerUpActionKey)
+        physicsWorld.speed = 1.0
+        scoreMultiplier = 1
+        isSlowMotionPowerUpActive = false
+        isScoreMultiplierActive = false
 
         updateGameOverLabel()
         gameOverLabel.isHidden = false
@@ -517,6 +712,9 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         score = 0
         lives = 3
         level = 1
+        scoreMultiplier = 1
+        isSlowMotionPowerUpActive = false
+        isScoreMultiplierActive = false
         isGameOver = false
         canRestartAfterGameOver = false
         isReadyToStart = true
