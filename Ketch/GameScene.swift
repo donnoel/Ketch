@@ -25,6 +25,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         case extraLife
         case slowMotion
         case scoreBoost
+        case shield
 
         var pointValue: Int {
             switch self {
@@ -32,7 +33,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
                 return 1
             case .star:
                 return 2
-            case .extraLife, .slowMotion, .scoreBoost:
+            case .extraLife, .slowMotion, .scoreBoost, .shield:
                 return 0
             }
         }
@@ -49,6 +50,8 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
                 return "Slow"
             case .scoreBoost:
                 return "x\(GameSessionViewModel.scoreMultiplierValue)"
+            case .shield:
+                return "Shield"
             }
         }
 
@@ -64,6 +67,8 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
                 return .systemBlue
             case .scoreBoost:
                 return .systemOrange
+            case .shield:
+                return .systemTeal
             }
         }
 
@@ -78,10 +83,12 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
                 return .extraLife
             case 90..<96:
                 return .slowMotion
-            default:
+            case 96..<99:
                 return .scoreBoost
-            }
+            default:
+                return .shield
         }
+    }
     }
 
     private let player = SKSpriteNode(imageNamed: "player-basket")
@@ -89,6 +96,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
     private let levelLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let gameOverLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
     private let startLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+    private let shieldIndicator = SKShapeNode(circleOfRadius: 52)
     private var heartNodes: [SKSpriteNode] = []
     private let gameSession = GameSessionViewModel()
 
@@ -148,7 +156,31 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         player.physicsBody?.contactTestBitMask = PhysicsCategory.fallingObject
         player.physicsBody?.collisionBitMask = 0
 
+        shieldIndicator.fillColor = UIColor.systemTeal.withAlphaComponent(0.12)
+        shieldIndicator.strokeColor = UIColor.systemTeal.withAlphaComponent(0.8)
+        shieldIndicator.lineWidth = 2
+        shieldIndicator.zPosition = 3
+        shieldIndicator.isHidden = true
+        shieldIndicator.name = "shieldIndicator"
+        player.addChild(shieldIndicator)
+
         addChild(player)
+    }
+
+    private func refreshShieldIndicator() {
+        let isShielded = gameSession.isShieldPowerUpActive
+        shieldIndicator.isHidden = !isShielded
+        shieldIndicator.alpha = isShielded ? 1.0 : 0.0
+        if isShielded {
+            shieldIndicator.removeAllActions()
+            let pulse = SKAction.sequence([
+                SKAction.fadeAlpha(to: 0.66, duration: 0.8),
+                SKAction.fadeAlpha(to: 1.0, duration: 0.8)
+            ])
+            shieldIndicator.run(SKAction.repeatForever(pulse))
+        } else {
+            shieldIndicator.removeAllActions()
+        }
     }
 
     private func setupLabels() {
@@ -295,7 +327,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
             node.size = CGSize(width: 44, height: 44)
             node.zPosition = 4
             return node
-        case .extraLife, .slowMotion, .scoreBoost:
+        case .extraLife, .slowMotion, .scoreBoost, .shield:
             let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
             label.fontSize = 14
             label.text = itemType.label
@@ -405,7 +437,15 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
             applySlowMotionPowerUp(at: position)
         case .scoreBoost:
             applyScoreMultiplierPowerUp(at: position)
+        case .shield:
+            applyShieldPowerUp(at: position)
         }
+    }
+
+    private func applyShieldPowerUp(at position: CGPoint) {
+        gameSession.activateShieldPowerUp()
+        refreshShieldIndicator()
+        showPowerUpFeedback(text: "Shield", at: position, color: .systemTeal)
     }
 
     private func applyExtraLifePowerUp(at position: CGPoint) {
@@ -545,15 +585,24 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         let missPosition = object.position
         object.removeFromParent()
 
-        let isGameOverAfterMiss = gameSession.loseLife()
+        let missResult = gameSession.loseLife()
         updateHearts()
+
+        switch missResult {
+        case .shielded:
+            refreshShieldIndicator()
+            showPowerUpFeedback(text: "Shield Saved!", at: missPosition, color: .systemTeal)
+            return
+        case .gameOver:
+            endGame()
+            return
+        case .lifeLost:
+            break
+        }
+
         showMissFeedback(at: missPosition)
         shakeScene()
         pulseLostHeart()
-
-        if isGameOverAfterMiss {
-            endGame()
-        }
     }
 
     private func showMissFeedback(at position: CGPoint) {
@@ -654,6 +703,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         removeAction(forKey: GameScene.scoreMultiplierPowerUpActionKey)
         physicsWorld.speed = 1.0
         gameSession.resetPowerUps()
+        refreshShieldIndicator()
 
         updateGameOverLabel()
         gameOverLabel.isHidden = false
@@ -690,6 +740,7 @@ final class GameScene: SKScene, SKPhysicsContactDelegate {
         setupScene()
         setupPhysics()
         setupPlayer()
+        refreshShieldIndicator()
         setupLabels()
         setupStartLabel()
     }

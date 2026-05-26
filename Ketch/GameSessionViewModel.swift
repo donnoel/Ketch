@@ -5,6 +5,12 @@ struct PointCatchResult {
     let didLevelUp: Bool
 }
 
+enum MissResult {
+    case shielded
+    case lifeLost
+    case gameOver
+}
+
 final class GameSessionViewModel {
     private static let highScoreKey = "Ketch.highScore"
     static let scoreMultiplierValue = 2
@@ -17,6 +23,7 @@ final class GameSessionViewModel {
     private(set) var scoreMultiplier = 1
     private(set) var isSlowMotionPowerUpActive = false
     private(set) var isScoreMultiplierActive = false
+    private(set) var isShieldPowerUpActive = false
 
     private let maxLives = 3
 
@@ -38,9 +45,14 @@ final class GameSessionViewModel {
     }
 
     @discardableResult
-    func loseLife() -> Bool {
+    func loseLife() -> MissResult {
+        if isShieldPowerUpActive {
+            isShieldPowerUpActive = false
+            return .shielded
+        }
+
         lives -= 1
-        return lives <= 0
+        return lives <= 0 ? .gameOver : .lifeLost
     }
 
     @discardableResult
@@ -73,14 +85,23 @@ final class GameSessionViewModel {
         scoreMultiplier = Self.scoreMultiplierValue
     }
 
+    func activateShieldPowerUp() {
+        isShieldPowerUpActive = true
+    }
+
     func deactivateScoreMultiplierPowerUp() {
         isScoreMultiplierActive = false
         scoreMultiplier = 1
     }
 
+    func deactivateShieldPowerUp() {
+        isShieldPowerUpActive = false
+    }
+
     func resetPowerUps() {
         deactivateSlowMotionPowerUp()
         deactivateScoreMultiplierPowerUp()
+        deactivateShieldPowerUp()
     }
 
     func resetGameState() {
