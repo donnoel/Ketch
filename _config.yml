@@ -1,0 +1,20 @@
+title: Ketch
+description: A beginner-friendly SpriteKit catch game for iPhone and iPad.
+tagline: Move the basket. Catch the fall. Learn the loop.
+project_label: Don Noel / Projects
+status_label: Learning prototype
+github_url: https://github.com/donnoel/Ketch
+url: https://donnoel.github.io
+baseurl: /Ketch
+lang: en-US
+
+remote_theme: donnoel/projects-theme@v1.0.0
+plugins:
+  - jekyll-remote-theme
+
+exclude:
+  - AGENTS.md
+  - AGENTS.project.md
+  - Ketch
+  - Ketch.xcodeproj
+
